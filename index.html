@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hardwood IQ — Basketball Quiz</title>
+<meta name="description" content="Test your basketball knowledge with topic-based quizzes, video plays, and image analysis." />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --court-orange: #E8521A;
+  --deep-navy:    #0D1B2A;
+  --slate-mid:    #1E3248;
+  --chalk-white:  #F2EFE7;
+  --gold-accent:  #F5A623;
+  --success-green:#27AE60;
+  --error-red:    #E74C3C;
+  --text-muted:   #8FA3B1;
+  --card-bg:      #152638;
+  --border:       rgba(242,239,231,0.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--deep-navy);color:var(--chalk-white);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;
+  border-bottom:1px solid var(--border);background:rgba(13,27,42,0.96);
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
+.logo{display:flex;align-items:center;gap:9px;font-size:1.1rem;font-weight:900;
+  letter-spacing:-0.02em;text-decoration:none;color:var(--chalk-white)}
+.logo-ball{font-size:1.45rem}
+.logo .iq{color:var(--court-orange)}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.score-pill{display:none;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.25);
+  border-radius:20px;padding:4px 12px;font-size:0.8rem;font-weight:700;color:var(--gold-accent);
+  align-items:center;gap:4px}
+.score-pill.on{display:flex}
+.admin-link{font-size:0.78rem;color:var(--text-muted);text-decoration:none;padding:5px 11px;
+  border:1px solid var(--border);border-radius:6px;transition:all .2s}
+.admin-link:hover{color:var(--chalk-white);border-color:var(--court-orange)}
+
+/* ── SCREENS ── */
+.screen{display:none;animation:fadeIn .25s ease}
+.screen.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── HOME ── */
+#home-screen{max-width:920px;margin:0 auto;padding:52px 24px 80px}
+.hero{text-align:center;margin-bottom:56px}
+.hero-badge{display:inline-block;background:var(--court-orange);color:#fff;font-size:.67rem;
+  font-weight:800;letter-spacing:.14em;text-transform:uppercase;padding:4px 13px;
+  border-radius:3px;margin-bottom:22px}
+.hero h1{font-size:clamp(2.1rem,6vw,3.7rem);font-weight:900;line-height:1.04;
+  letter-spacing:-.03em;margin-bottom:16px}
+.hero h1 em{font-style:normal;color:var(--court-orange)}
+.hero p{font-size:1rem;color:var(--text-muted);max-width:450px;margin:0 auto;line-height:1.65}
+.divider{width:100%;max-width:340px;height:2px;margin:26px auto;
+  background:linear-gradient(90deg,transparent,var(--court-orange),transparent)}
+
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sec-label{font-size:.7rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted)}
+.mix-btn{background:none;border:1px solid var(--border);color:var(--text-muted);
+  border-radius:6px;padding:5px 11px;font-size:.76rem;font-weight:600;cursor:pointer;transition:all .2s}
+.mix-btn:hover{border-color:var(--gold-accent);color:var(--gold-accent)}
+
+.topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:11px;margin-bottom:34px}
+.topic-card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
+  padding:20px 16px;cursor:pointer;transition:all .2s;text-align:left;
+  position:relative;overflow:hidden;user-select:none}
+.topic-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--court-orange);transform:scaleX(0);transition:transform .25s;transform-origin:left}
+.topic-card:hover{border-color:rgba(232,82,26,.45);transform:translateY(-3px);
+  box-shadow:0 10px 28px rgba(232,82,26,.12)}
+.topic-card:hover::after,.topic-card.sel::after{transform:scaleX(1)}
+.topic-card.sel{border-color:var(--court-orange);background:rgba(232,82,26,.1);
+  box-shadow:0 0 0 2px rgba(232,82,26,.25)}
+.t-icon{font-size:1.9rem;margin-bottom:10px;display:block;line-height:1}
+.t-name{font-size:.9rem;font-weight:800;margin-bottom:4px}
+.t-desc{font-size:.71rem;color:var(--text-muted);line-height:1.44}
+.t-count{display:inline-block;font-size:.67rem;color:var(--court-orange);font-weight:700;
+  margin-top:9px;background:rgba(232,82,26,.12);padding:2px 7px;border-radius:3px}
+.t-count.zero{color:var(--text-muted);background:rgba(143,163,177,.1)}
+
+.start-row{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.btn-primary{background:var(--court-orange);color:#fff;border:none;border-radius:8px;
+  padding:12px 28px;font-size:.93rem;font-weight:800;cursor:pointer;transition:all .2s;
+  display:inline-flex;align-items:center;gap:5px}
+.btn-primary:hover{background:#d4470f;transform:translateY(-1px);box-shadow:0 6px 20px rgba(232,82,26,.38)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-sec{background:transparent;color:var(--chalk-white);border:1px solid var(--border);
+  border-radius:8px;padding:12px 20px;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-sec:hover{border-color:rgba(242,239,231,.3)}
+.hint{font-size:.82rem;color:var(--text-muted)}
+
+/* ── QUIZ SCREEN ── */
+#quiz-screen{max-width:700px;margin:0 auto;padding:26px 24px 80px}
+.quiz-hdr{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.topic-pill{background:rgba(232,82,26,.14);border:1px solid rgba(232,82,26,.3);
+  color:var(--court-orange);font-size:.7rem;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.q-ctr{font-size:.8rem;color:var(--text-muted);margin-left:auto;white-space:nowrap}
+.streak{display:none;align-items:center;gap:4px;background:rgba(245,166,35,.12);
+  border:1px solid rgba(245,166,35,.25);color:var(--gold-accent);
+  font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap}
+.streak.on{display:flex}
+
+.prog-track{height:5px;background:var(--border);border-radius:3px;margin-bottom:24px;overflow:hidden}
+.prog-fill{height:100%;background:var(--court-orange);border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+
+/* Timer */
+.timer-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:.8rem;color:var(--text-muted)}
+.timer-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.timer-fill{height:100%;background:var(--success-green);border-radius:2px;transition:width .1s linear,background .3s;width:100%}
+.timer-fill.warn{background:var(--gold-accent)}
+.timer-fill.danger{background:var(--error-red)}
+.timer-num{font-size:.76rem;font-weight:700;min-width:20px;text-align:right}
+
+/* Video embed */
+.media-wrap{border-radius:14px;overflow:hidden;background:#000;margin-bottom:20px;
+  position:relative;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.media-wrap.video-mode{aspect-ratio:16/9}
+.media-wrap.image-mode{display:flex;align-items:center;justify-content:center;
+  min-height:220px;max-height:420px;background:var(--card-bg)}
+.media-wrap iframe{width:100%;height:100%;border:none;display:block}
+.media-wrap .q-image{width:100%;max-height:420px;object-fit:contain;display:block;border-radius:14px}
+.media-tag{position:absolute;top:10px;left:10px;z-index:2;background:rgba(0,0,0,.72);color:#fff;
+  font-size:.67rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 8px;border-radius:5px;backdrop-filter:blur(6px)}
+
+/* Question card */
+.q-card{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;
+  padding:24px;margin-bottom:16px}
+.q-meta{display:flex;align-items:center;gap:9px;margin-bottom:13px;flex-wrap:wrap}
+.pts-badge{font-size:.69rem;color:var(--gold-accent);font-weight:800;text-transform:uppercase;
+  letter-spacing:.08em;background:rgba(245,166,35,.1);padding:3px 8px;border-radius:4px}
+.fmt-badge{font-size:.67rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;background:rgba(143,163,177,.1);padding:3px 8px;border-radius:4px}
+.q-text{font-size:1.08rem;font-weight:700;line-height:1.55}
+
+/* Answers */
+.ans-grid{display:grid;gap:9px}
+.ans-grid.two-col{grid-template-columns:1fr 1fr}
+.ans-btn{background:var(--card-bg);border:1px solid var(--border);border-radius:11px;
+  padding:12px 15px;color:var(--chalk-white);font-size:.9rem;font-weight:500;
+  cursor:pointer;transition:border-color .15s,background .15s,transform .12s;
+  text-align:left;display:flex;align-items:center;gap:11px;width:100%}
+.opt-lbl{width:27px;height:27px;border-radius:50%;flex-shrink:0;
+  border:1.5px solid rgba(242,239,231,.2);display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;font-weight:800;transition:all .15s}
+.opt-txt{flex:1;text-align:left;line-height:1.35}
+.ans-btn:hover:not(:disabled){border-color:rgba(232,82,26,.5);background:rgba(232,82,26,.07);transform:translateX(2px)}
+.ans-btn:hover:not(:disabled) .opt-lbl{border-color:var(--court-orange);color:var(--court-orange)}
+.ans-btn.correct{border-color:var(--success-green);background:rgba(39,174,96,.1)}
+.ans-btn.correct .opt-lbl{background:var(--success-green);border-color:var(--success-green);color:#fff}
+.ans-btn.wrong{border-color:var(--error-red);background:rgba(231,76,60,.08)}
+.ans-btn.wrong .opt-lbl{background:var(--error-red);border-color:var(--error-red);color:#fff}
+.ans-btn:disabled{cursor:default}
+
+.fb-row{display:flex;align-items:center;justify-content:space-between;min-height:46px;margin-top:14px;gap:11px}
+.fb-msg{font-size:.88rem;font-weight:700}
+.fb-msg.ok{color:var(--success-green)}
+.fb-msg.no{color:var(--error-red)}
+.btn-next{background:var(--court-orange);color:#fff;border:none;border-radius:8px;
+  padding:10px 20px;font-size:.86rem;font-weight:800;cursor:pointer;transition:all .2s;
+  display:none;align-items:center;gap:5px;white-space:nowrap}
+.btn-next.on{display:inline-flex}
+.btn-next:hover{background:#d4470f}
+.kbd-hint{font-size:.7rem;color:var(--text-muted);margin-top:12px}
+.kbd-hint kbd{background:rgba(242,239,231,.07);border:1px solid rgba(242,239,231,.14);
+  border-radius:4px;padding:1px 5px;font-family:inherit;font-size:.68rem}
+
+/* ── REVIEW ── */
+#review-screen{max-width:700px;margin:0 auto;padding:28px 24px 80px}
+.rev-hdr{margin-bottom:22px}
+.rev-hdr h2{font-size:1.28rem;font-weight:800;margin-bottom:3px}
+.rev-hdr p{font-size:.83rem;color:var(--text-muted)}
+.rev-list{display:flex;flex-direction:column;gap:11px;margin-bottom:26px}
+.rev-item{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;
+  padding:15px 17px;border-left:3px solid transparent}
+.rev-item.ok{border-left-color:var(--success-green)}
+.rev-item.no{border-left-color:var(--error-red)}
+.rev-top{display:flex;align-items:flex-start;gap:9px;margin-bottom:7px}
+.rev-num{font-size:.68rem;font-weight:800;color:var(--text-muted);min-width:22px;margin-top:2px}
+.rev-q{font-size:.88rem;font-weight:600;line-height:1.44;flex:1}
+.rev-icon{font-size:.95rem;margin-top:1px}
+.rev-img{width:80px;height:54px;object-fit:cover;border-radius:6px;flex-shrink:0;margin-left:4px}
+.rev-ans{display:flex;gap:9px;flex-wrap:wrap;padding-left:31px;font-size:.78rem}
+.rev-yours{color:var(--error-red)}
+.rev-right{color:var(--success-green)}
+.rev-skip{color:var(--text-muted);font-style:italic}
+
+/* ── RESULTS ── */
+#results-screen{max-width:570px;margin:0 auto;padding:50px 24px 80px;text-align:center}
+.res-trophy{font-size:3.8rem;margin-bottom:7px;display:block;
+  animation:pop .5s cubic-bezier(.175,.885,.32,1.275)}
+@keyframes pop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+.res-score{font-size:3.8rem;font-weight:900;line-height:1;color:var(--court-orange);margin-bottom:2px}
+.res-label{font-size:.83rem;color:var(--text-muted);margin-bottom:5px}
+.res-topic{font-size:1.2rem;font-weight:800;margin-bottom:28px}
+.res-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:18px}
+.rs-card{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:15px 9px}
+.rs-num{font-size:1.5rem;font-weight:900}
+.rs-num.g{color:var(--success-green)}
+.rs-num.r{color:var(--error-red)}
+.rs-lbl{font-size:.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
+.res-grade{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;
+  padding:15px 18px;margin-bottom:26px;font-size:.88rem;line-height:1.5;color:var(--text-muted)}
+.res-actions{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
+
+/* ── LOADING / EMPTY ── */
+.spinner-wrap{display:flex;align-items:center;justify-content:center;padding:56px 24px;gap:11px;
+  color:var(--text-muted);font-size:.86rem}
+.spin{width:21px;height:21px;border:2px solid var(--border);border-top-color:var(--court-orange);
+  border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-st{text-align:center;padding:50px 24px;color:var(--text-muted)}
+.empty-st .ei{font-size:2.7rem;margin-bottom:13px}
+.empty-st h3{color:var(--chalk-white);font-size:1.05rem;margin-bottom:5px}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--slate-mid);border:1px solid rgba(242,239,231,.12);
+  color:var(--chalk-white);padding:10px 18px;border-radius:8px;
+  font-size:.83rem;font-weight:600;transition:transform .28s ease;
+  z-index:9999;white-space:nowrap;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.toast.suc{border-color:var(--success-green)}
+.toast.err{border-color:var(--error-red)}
+
+/* ── IMAGE LIGHTBOX ── */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);
+  display:none;align-items:center;justify-content:center;z-index:500;padding:16px;cursor:zoom-out}
+.lightbox.on{display:flex}
+.lightbox img{max-width:90vw;max-height:90vh;border-radius:10px;object-fit:contain;cursor:default}
+.lb-close{position:absolute;top:16px;right:18px;background:none;border:none;
+  color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;opacity:.8}
+.lb-close:hover{opacity:1}
+
+@media(max-width:520px){
+  .hero h1{font-size:2rem}
+  .topic-grid{grid-template-columns:1fr 1fr}
+  .res-stats{grid-template-columns:1fr 1fr 1fr}
+  .ans-grid.two-col{grid-template-columns:1fr}
+  .kbd-hint{display:none}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html">
+    <span class="logo-ball">🏀</span> Hardwood<span class="iq">IQ</span>
+  </a>
+  <div class="hdr-right">
+    <div class="score-pill" id="score-pill">⭐ <span id="live-score">0</span> pts</div>
+    <a class="admin-link" href="admin.html">Admin ↗</a>
+  </div>
+</header>
+
+<!-- ── HOME ── -->
+<div id="home-screen" class="screen active">
+  <div class="hero">
+    <span class="hero-badge">Basketball Trivia</span>
+    <h1>How deep is your<br><em>hardwood IQ?</em></h1>
+    <div class="divider"></div>
+    <p>Pick a topic and test your basketball knowledge — rules, history, iconic plays, image analysis, and more.</p>
+  </div>
+  <div class="sec-hdr">
+    <span class="sec-label">Choose a Topic</span>
+    <button class="mix-btn" onclick="startAll()">🎲 Random Mix</button>
+  </div>
+  <div id="topic-grid" class="topic-grid">
+    <div class="spinner-wrap"><div class="spin"></div> Loading topics…</div>
+  </div>
+  <div class="start-row">
+    <button class="btn-primary" id="start-btn" disabled onclick="startQuiz()">Start Quiz →</button>
+    <span class="hint" id="sel-hint">Select a topic to begin</span>
+  </div>
+</div>
+
+<!-- ── QUIZ ── -->
+<div id="quiz-screen" class="screen">
+  <div class="quiz-hdr">
+    <span class="topic-pill" id="quiz-pill">—</span>
+    <span class="streak" id="streak-badge">🔥 <span id="streak-num">0</span></span>
+    <span class="q-ctr" id="q-ctr">1 / ?</span>
+  </div>
+  <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+
+  <div class="timer-row" id="timer-row" style="display:none">
+    <span style="font-size:.73rem;white-space:nowrap">⏱ Time</span>
+    <div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
+    <span class="timer-num" id="timer-num">30</span>
+  </div>
+
+  <!-- VIDEO media -->
+  <div class="media-wrap video-mode" id="video-wrap" style="display:none">
+    <span class="media-tag">📹 Watch the play</span>
+    <iframe id="video-frame" allowfullscreen allow="autoplay;encrypted-media"></iframe>
+  </div>
+
+  <!-- IMAGE media -->
+  <div class="media-wrap image-mode" id="image-wrap" style="display:none">
+    <span class="media-tag">🖼 Analyze this</span>
+    <img id="q-img" class="q-image" src="" alt="" onclick="openLightbox(this.src,this.alt)" style="cursor:zoom-in" title="Click to enlarge" />
+  </div>
+
+  <div class="q-card">
+    <div class="q-meta">
+      <span class="pts-badge" id="q-pts">⭐ 10 pts</span>
+      <span class="fmt-badge" id="q-fmt">Multiple Choice</span>
+    </div>
+    <div class="q-text" id="q-text">…</div>
+  </div>
+
+  <div class="ans-grid" id="ans-grid"></div>
+
+  <div class="fb-row">
+    <span class="fb-msg" id="fb-msg"></span>
+    <button class="btn-next" id="btn-next" onclick="nextQuestion()">Next →</button>
+  </div>
+  <div class="kbd-hint">Press <kbd>1</kbd>–<kbd>4</kbd> to select · <kbd>Enter</kbd> to continue</div>
+</div>
+
+<!-- ── REVIEW ── -->
+<div id="review-screen" class="screen">
+  <div class="rev-hdr"><h2>Answer Review</h2><p>See how you did on each question</p></div>
+  <div class="rev-list" id="rev-list"></div>
+  <div style="display:flex;gap:9px;flex-wrap:wrap">
+    <button class="btn-primary" onclick="retryQuiz()">Try Again</button>
+    <button class="btn-sec" onclick="goHome()">← All Topics</button>
+  </div>
+</div>
+
+<!-- ── RESULTS ── -->
+<div id="results-screen" class="screen">
+  <span class="res-trophy" id="res-trophy">🏆</span>
+  <div class="res-score" id="res-score">0</div>
+  <div class="res-label">points earned</div>
+  <div class="res-topic" id="res-topic"></div>
+  <div class="res-stats">
+    <div class="rs-card"><div class="rs-num g" id="rs-correct">0</div><div class="rs-lbl">Correct</div></div>
+    <div class="rs-card"><div class="rs-num r" id="rs-wrong">0</div><div class="rs-lbl">Wrong</div></div>
+    <div class="rs-card"><div class="rs-num" id="rs-pct">0%</div><div class="rs-lbl">Accuracy</div></div>
+  </div>
+  <div class="res-grade" id="res-grade"></div>
+  <div class="res-actions">
+    <button class="btn-primary" onclick="showReview()">Review Answers</button>
+    <button class="btn-sec" onclick="retryQuiz()">Try Again</button>
+    <button class="btn-sec" onclick="goHome()">← Topics</button>
+  </div>
+</div>
+
+<!-- ── LIGHTBOX ── -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <img id="lb-img" src="" alt="" onclick="event.stopPropagation()" />
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SB_URL = 'https://ofncwpbpsgmoezxhfxya.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mbmN3cGJwc2dtb2V6eGhmeHlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0ODc2MDksImV4cCI6MjA5NTA2MzYwOX0.q3cvSMxgSvfnYjcKxDWiYrMSnfTfiqoKGF2OCe2TwhQ';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+const TIMER_SECONDS = 30;
+const USE_TIMER = false;
+
+let allTopics = [], selectedTopic = null, questions = [];
+let idx = 0, score = 0, correct = 0, streak = 0;
+let answered = false, timerInt = null, timerLeft = TIMER_SECONDS;
+let log = [];
+
+// ── Boot ──
+async function init() {
+  const { data, error } = await sb.from('topics').select('*').order('name');
+  if (error) { showToast('Could not load topics', 'err'); return; }
+  allTopics = data || [];
+  renderTopics();
+}
+
+function renderTopics() {
+  const grid = document.getElementById('topic-grid');
+  if (!allTopics.length) {
+    grid.innerHTML = `<div class="empty-st"><div class="ei">🏀</div><h3>No topics yet</h3>
+      <p>Add some in the <a href="admin.html" style="color:var(--court-orange)">Admin</a> panel.</p></div>`;
+    return;
+  }
+  grid.innerHTML = allTopics.map(t => `
+    <div class="topic-card" id="tc-${t.id}" onclick="pickTopic(${t.id})"
+         tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')pickTopic(${t.id})">
+      <span class="t-icon">${t.icon||'🏀'}</span>
+      <div class="t-name">${esc(t.name)}</div>
+      <div class="t-desc">${esc(t.description||'')}</div>
+      <span class="t-count" id="tcc-${t.id}">…</span>
+    </div>`).join('');
+  loadCounts();
+}
+
+async function loadCounts() {
+  const { data } = await sb.from('questions').select('topic_id');
+  const c = {};
+  (data||[]).forEach(r => { c[r.topic_id] = (c[r.topic_id]||0)+1; });
+  allTopics.forEach(t => {
+    const el = document.getElementById('tcc-'+t.id);
+    if (!el) return;
+    const n = c[t.id]||0;
+    el.textContent = n ? `${n} question${n!==1?'s':''}` : 'No questions';
+    el.className = 't-count'+(n ? '' : ' zero');
+  });
+}
+
+function pickTopic(id) {
+  selectedTopic = allTopics.find(t => t.id===id)||null;
+  document.querySelectorAll('.topic-card').forEach(c => c.classList.remove('sel'));
+  document.getElementById('tc-'+id).classList.add('sel');
+  document.getElementById('start-btn').disabled = false;
+  document.getElementById('sel-hint').textContent = `Ready — "${selectedTopic.name}"`;
+}
+
+// ── Start ──
+async function startQuiz() {
+  if (!selectedTopic) return;
+  await loadAndPlay(selectedTopic.id, selectedTopic.name, selectedTopic.icon);
+}
+async function startAll() {
+  await loadAndPlay(null, 'Random Mix', '🎲');
+}
+async function loadAndPlay(topicId, name, icon) {
+  let q = sb.from('questions').select('*');
+  if (topicId) q = q.eq('topic_id', topicId);
+  const { data, error } = await q;
+  if (error) { showToast('Error loading questions', 'err'); return; }
+  if (!data||!data.length) { showToast('No questions in this topic yet!', 'err'); return; }
+  questions = shuffle(data);
+  idx = 0; score = 0; correct = 0; streak = 0; answered = false; log = [];
+  document.getElementById('quiz-pill').textContent = (icon||'') + ' ' + name;
+  document.getElementById('live-score').textContent = '0';
+  document.getElementById('score-pill').classList.add('on');
+  updateStreak();
+  showScreen('quiz-screen');
+  renderQ();
+}
+
+// ── Render Question ──
+function renderQ() {
+  clearTimer(); answered = false;
+  const q = questions[idx];
+  const total = questions.length;
+
+  document.getElementById('q-ctr').textContent = `${idx+1} / ${total}`;
+  document.getElementById('prog-fill').style.width = `${(idx/total)*100}%`;
+  document.getElementById('q-pts').textContent = `⭐ ${q.points} pts`;
+  document.getElementById('q-fmt').textContent = q.answer_format==='true_false' ? 'True / False' : 'Multiple Choice';
+  document.getElementById('q-text').textContent = q.question_text;
+  document.getElementById('fb-msg').textContent = '';
+  document.getElementById('fb-msg').className = 'fb-msg';
+  document.getElementById('btn-next').classList.remove('on');
+
+  // Video
+  const vw = document.getElementById('video-wrap');
+  const vf = document.getElementById('video-frame');
+  if (q.question_type==='video' && q.video_url) {
+    vw.style.display = 'block'; vf.src = toEmbed(q.video_url);
+  } else { vw.style.display = 'none'; vf.src = ''; }
+
+  // Image
+  const iw = document.getElementById('image-wrap');
+  const im = document.getElementById('q-img');
+  if (q.question_type==='image' && q.image_url) {
+    iw.style.display = 'flex';
+    im.src = q.image_url;
+    im.alt = q.image_alt || 'Question image';
+  } else { iw.style.display = 'none'; im.src = ''; }
+
+  // Options
+  const opts = Array.isArray(q.options) ? q.options : JSON.parse(q.options);
+  const isTF = q.answer_format==='true_false' || opts.length===2;
+  const labels = ['A','B','C','D','E','F'];
+  const grid = document.getElementById('ans-grid');
+  grid.className = 'ans-grid'+(isTF ? ' two-col' : '');
+  grid.innerHTML = opts.map((opt,i) => `
+    <button class="ans-btn" id="ab-${i}"
+      data-opt="${esc(opt)}" data-correct="${esc(q.correct_option)}" data-pts="${q.points}"
+      onclick="pick(${i})">
+      <span class="opt-lbl">${isTF ? (i===0?'T':'F') : labels[i]}</span>
+      <span class="opt-txt">${esc(opt)}</span>
+    </button>`).join('');
+
+  if (USE_TIMER) {
+    document.getElementById('timer-row').style.display = 'flex';
+    startTimer();
+  } else {
+    document.getElementById('timer-row').style.display = 'none';
+  }
+}
+
+function pick(i) {
+  if (answered) return;
+  answered = true; clearTimer();
+  const btn = document.getElementById('ab-'+i);
+  const chosen = btn.dataset.opt;
+  const correctOpt = btn.dataset.correct;
+  const pts = parseInt(btn.dataset.pts);
+  const all = document.querySelectorAll('.ans-btn');
+  all.forEach(b => b.disabled = true);
+
+  const isOk = chosen === correctOpt;
+  log.push({ q: questions[idx], chosen, correct: correctOpt, wasCorrect: isOk });
+
+  if (isOk) {
+    btn.classList.add('correct'); score += pts; correct++; streak++;
+    document.getElementById('fb-msg').textContent = '✓ Correct!';
+    document.getElementById('fb-msg').className = 'fb-msg ok';
+  } else {
+    btn.classList.add('wrong'); streak = 0;
+    document.getElementById('fb-msg').textContent = `✗ Answer: ${correctOpt}`;
+    document.getElementById('fb-msg').className = 'fb-msg no';
+    all.forEach(b => { if (b.dataset.opt===correctOpt) b.classList.add('correct'); });
+  }
+  updateStreak();
+  document.getElementById('live-score').textContent = score;
+  const nb = document.getElementById('btn-next');
+  nb.textContent = idx < questions.length-1 ? 'Next →' : 'See Results →';
+  nb.classList.add('on');
+}
+
+function nextQuestion() {
+  idx++;
+  if (idx >= questions.length) showResults();
+  else renderQ();
+}
+
+// ── Timer ──
+function startTimer() {
+  timerLeft = TIMER_SECONDS; updateTimerUI();
+  timerInt = setInterval(() => {
+    timerLeft--;
+    updateTimerUI();
+    if (timerLeft <= 0) { clearTimer(); timeUp(); }
+  }, 1000);
+}
+function updateTimerUI() {
+  const pct = (timerLeft/TIMER_SECONDS)*100;
+  const f = document.getElementById('timer-fill');
+  f.style.width = pct+'%';
+  f.className = 'timer-fill'+(timerLeft<=5?' danger':timerLeft<=10?' warn':'');
+  document.getElementById('timer-num').textContent = timerLeft;
+}
+function clearTimer() { clearInterval(timerInt); timerInt = null; }
+function timeUp() {
+  if (answered) return; answered = true;
+  document.querySelectorAll('.ans-btn').forEach(b => {
+    b.disabled = true;
+    if (b.dataset.opt===b.dataset.correct) b.classList.add('correct');
+  });
+  document.getElementById('fb-msg').textContent = "⏰ Time's up!";
+  document.getElementById('fb-msg').className = 'fb-msg no';
+  streak = 0; updateStreak();
+  log.push({ q: questions[idx], chosen: null, correct: questions[idx].correct_option, wasCorrect: false });
+  const nb = document.getElementById('btn-next');
+  nb.textContent = idx < questions.length-1 ? 'Next →' : 'See Results →';
+  nb.classList.add('on');
+}
+
+// ── Results ──
+function showResults() {
+  clearTimer();
+  document.getElementById('score-pill').classList.remove('on');
+  const total = questions.length;
+  const pct = Math.round((correct/total)*100);
+  document.getElementById('res-score').textContent = score;
+  document.getElementById('res-topic').textContent =
+    selectedTopic ? (selectedTopic.icon||'')+' '+selectedTopic.name : '🎲 Random Mix';
+  document.getElementById('rs-correct').textContent = correct;
+  document.getElementById('rs-wrong').textContent = total-correct;
+  document.getElementById('rs-pct').textContent = pct+'%';
+  const g = [[100,'🏆',"Perfect! You're an all-time hardwood legend."],
+             [80,'🌟',"Outstanding. Your basketball IQ is seriously elite."],
+             [60,'👏',"Solid. You've got real court sense — keep studying."],
+             [40,'📚',"Not bad for a rookie. More tape sessions needed!"],
+             [0,'🎯',"Every legend starts somewhere. Hit the books!"]];
+  const [,e,m] = g.find(([min]) => pct>=min);
+  document.getElementById('res-trophy').textContent = e;
+  document.getElementById('res-grade').textContent = m;
+  showScreen('results-screen');
+}
+
+function showReview() {
+  document.getElementById('rev-list').innerHTML = log.map((entry,i) => {
+    const skipped = entry.chosen === null;
+    const img = entry.q.question_type==='image' && entry.q.image_url
+      ? `<img class="rev-img" src="${esc(entry.q.image_url)}" alt="Q${i+1} image" />`
+      : '';
+    return `
+      <div class="rev-item ${entry.wasCorrect?'ok':'no'}">
+        <div class="rev-top">
+          <span class="rev-num">Q${i+1}</span>
+          <span class="rev-q">${esc(entry.q.question_text)}</span>
+          ${img}
+          <span class="rev-icon">${entry.wasCorrect?'✅':skipped?'⏰':'❌'}</span>
+        </div>
+        <div class="rev-ans">
+          ${skipped ? `<span class="rev-skip">Time's up</span>`
+            : `<span class="rev-yours">Your answer: ${esc(entry.chosen)}</span>`}
+          ${!entry.wasCorrect ? `<span class="rev-right">Correct: ${esc(entry.correct)}</span>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+  showScreen('review-screen');
+}
+
+function retryQuiz() { selectedTopic ? startQuiz() : startAll(); }
+function goHome() {
+  clearTimer();
+  document.getElementById('score-pill').classList.remove('on');
+  showScreen('home-screen');
+}
+function updateStreak() {
+  document.getElementById('streak-num').textContent = streak;
+  document.getElementById('streak-badge').className = 'streak'+(streak>=2?' on':'');
+}
+
+// ── Lightbox ──
+function openLightbox(src, alt) {
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lb-img').alt = alt||'';
+  document.getElementById('lightbox').classList.add('on');
+}
+function closeLightbox() { document.getElementById('lightbox').classList.remove('on'); }
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') closeLightbox();
+});
+
+// ── Keyboard nav ──
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('quiz-screen').classList.contains('active')) return;
+  if (e.key==='Enter') {
+    const nb = document.getElementById('btn-next');
+    if (nb.classList.contains('on')) { nextQuestion(); return; }
+  }
+  if (['1','2','3','4','5','6'].includes(e.key)) {
+    const i = parseInt(e.key)-1;
+    const b = document.getElementById('ab-'+i);
+    if (b && !b.disabled) pick(i);
+  }
+});
+
+// ── Helpers ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function shuffle(a) { return [...a].sort(() => Math.random()-.5); }
+function esc(s) {
+  return String(s??'').replace(/[&<>"']/g, m =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function toEmbed(url) {
+  const yt = (url||'').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}?rel=0&autoplay=0`;
+  const vm = (url||'').match(/vimeo\.com\/(\d+)/);
+  if (vm) return `https://player.vimeo.com/video/${vm[1]}`;
+  return url;
+}
+let _tt;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast on'+(type?' '+type:'');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => { t.className='toast'; }, 3000);
+}
+
+init();
+</script>
+</body>
+</html>
